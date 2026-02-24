@@ -1,0 +1,99 @@
+import os from 'os';
+import path from 'path';
+
+import { readEnvFile } from './env.js';
+
+// Read config values from .env (falls back to process.env).
+// Secrets are NOT read here — they stay on disk and are loaded only
+// where needed (container-runner.ts) to avoid leaking to child processes.
+const envConfig = readEnvFile([
+  'ASSISTANT_NAME',
+  'ASSISTANT_HAS_OWN_NUMBER',
+  'SLACK_BOT_TOKEN',
+  'SLACK_APP_TOKEN',
+  'SLACK_ONLY',
+  'SLACK_TRIGGER',
+  'LINEAR_API_KEY',
+  'LINEAR_USER_ID',
+  'LINEAR_POLL_INTERVAL',
+  'LINEAR_ONLY',
+]);
+
+export const ASSISTANT_NAME =
+  process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
+export const ASSISTANT_HAS_OWN_NUMBER =
+  (process.env.ASSISTANT_HAS_OWN_NUMBER || envConfig.ASSISTANT_HAS_OWN_NUMBER) === 'true';
+export const POLL_INTERVAL = 500;
+export const SCHEDULER_POLL_INTERVAL = 60000;
+
+// Absolute paths needed for container mounts
+const PROJECT_ROOT = process.cwd();
+const HOME_DIR = process.env.HOME || os.homedir();
+
+// Mount security: allowlist stored OUTSIDE project root, never mounted into containers
+export const MOUNT_ALLOWLIST_PATH = path.join(
+  HOME_DIR,
+  '.config',
+  'nanoclaw',
+  'mount-allowlist.json',
+);
+export const STORE_DIR = path.resolve(PROJECT_ROOT, 'store');
+export const GROUPS_DIR = path.resolve(PROJECT_ROOT, 'groups');
+export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
+export const MAIN_GROUP_FOLDER = 'main';
+
+export const CONTAINER_IMAGE =
+  process.env.CONTAINER_IMAGE || 'nanoclaw-agent:latest';
+export const CONTAINER_TIMEOUT = parseInt(
+  process.env.CONTAINER_TIMEOUT || '1800000',
+  10,
+);
+export const CONTAINER_MAX_OUTPUT_SIZE = parseInt(
+  process.env.CONTAINER_MAX_OUTPUT_SIZE || '10485760',
+  10,
+); // 10MB default
+export const IPC_POLL_INTERVAL = 1000;
+export const IDLE_TIMEOUT = parseInt(
+  process.env.IDLE_TIMEOUT || '1800000',
+  10,
+); // 30min default — how long to keep container alive after last result
+export const MAX_CONCURRENT_CONTAINERS = Math.max(
+  1,
+  parseInt(process.env.MAX_CONCURRENT_CONTAINERS || '5', 10) || 5,
+);
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export const TRIGGER_PATTERN = new RegExp(
+  `^@${escapeRegex(ASSISTANT_NAME)}\\b`,
+  'i',
+);
+
+// Timezone for scheduled tasks (cron expressions, etc.)
+// Uses system timezone by default
+export const TIMEZONE =
+  process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// Slack configuration
+export const SLACK_BOT_TOKEN =
+  process.env.SLACK_BOT_TOKEN || envConfig.SLACK_BOT_TOKEN || '';
+export const SLACK_APP_TOKEN =
+  process.env.SLACK_APP_TOKEN || envConfig.SLACK_APP_TOKEN || '';
+export const SLACK_ONLY =
+  (process.env.SLACK_ONLY || envConfig.SLACK_ONLY) === 'true';
+export const SLACK_TRIGGER =
+  process.env.SLACK_TRIGGER || envConfig.SLACK_TRIGGER || '';
+
+// Linear configuration
+export const LINEAR_API_KEY =
+  process.env.LINEAR_API_KEY || envConfig.LINEAR_API_KEY || '';
+export const LINEAR_USER_ID =
+  process.env.LINEAR_USER_ID || envConfig.LINEAR_USER_ID || '';
+export const LINEAR_POLL_INTERVAL = parseInt(
+  process.env.LINEAR_POLL_INTERVAL || envConfig.LINEAR_POLL_INTERVAL || '30000',
+  10,
+);
+export const LINEAR_ONLY =
+  (process.env.LINEAR_ONLY || envConfig.LINEAR_ONLY) === 'true';
