@@ -8,6 +8,7 @@ adds:
   - container/agent-runner/src/linear-mcp.ts
   - groups/linear/CLAUDE.md  
   - groups/linear/.claude/skills/create-mockup/SKILL.md
+  - scripts/register-group.ts
 modifies:
   - src/config.ts
   - src/index.ts

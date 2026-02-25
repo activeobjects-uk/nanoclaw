@@ -60,6 +60,7 @@ This deterministically:
 - Adds `src/channels/linear.test.ts` (unit tests)
 - Adds `container/agent-runner/src/linear-mcp.ts` (MCP server with Linear tools)
 - Adds `groups/linear/CLAUDE.md` (dedicated group instructions)
+- Adds `scripts/register-group.ts` (cross-platform group registration utility)
 - Merges Linear config into `src/config.ts` (`LINEAR_API_KEY`, `LINEAR_USER_ID`, `LINEAR_POLL_INTERVAL`)
 - Merges Linear channel creation into `src/index.ts`
 - Adds `LINEAR_API_KEY` and `GITHUB_TOKEN` to `readSecrets()` in `src/container-runner.ts`
@@ -107,10 +108,7 @@ The container reads environment from `data/env/env`, not `.env` directly.
 ### Register the Linear group
 
 ```bash
-sqlite3 store/messages.db "INSERT OR REPLACE INTO registered_groups
-  (jid, name, folder, trigger_pattern, added_at, requires_trigger)
-  VALUES ('linear:__channel__', 'Linear Issues', 'linear', '@<ASSISTANT_NAME>',
-  '$(date -u +%Y-%m-%dT%H:%M:%SZ)', 0)"
+npx tsx scripts/register-group.ts "linear:__channel__" "Linear Issues" linear "@<ASSISTANT_NAME>" --no-trigger-required
 ```
 
 The sentinel JID `linear:__channel__` routes all Linear issues to the `linear` group folder. Individual issue identifiers are embedded in message content.
@@ -180,7 +178,7 @@ launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
    curl -s -H "Authorization: <KEY>" -H "Content-Type: application/json" \
      -d '{"query":"{ viewer { id } }"}' https://api.linear.app/graphql
    ```
-3. Ensure `linear:__channel__` group is registered: `sqlite3 store/messages.db "SELECT * FROM registered_groups WHERE jid = 'linear:__channel__'"`
+3. Ensure `linear:__channel__` group is registered — re-run: `npx tsx scripts/register-group.ts "linear:__channel__" "Linear Issues" linear "" --no-trigger-required`
 4. Check logs for API errors
 
 ### MCP tools not available in container
@@ -208,6 +206,7 @@ Linear allows ~1500 API requests/hour. At 30s polling with ~3-5 calls per cycle,
 5. Remove `LINEAR_API_KEY` from `readSecrets()` in `src/container-runner.ts`
 6. Remove Linear MCP from `container/agent-runner/src/index.ts`
 7. Remove `'mcp__linear__*'` from `allowedTools`
-8. Remove Linear registration: `sqlite3 store/messages.db "DELETE FROM registered_groups WHERE jid = 'linear:__channel__'"`
-9. Uninstall: `npm uninstall @linear/sdk` (in both root and container/agent-runner)
-10. Rebuild: `npm run build && cd container && ./build.sh`
+8. Remove Linear registration — delete from DB via Node: `node -e "require('./src/db.js').db.prepare(\"DELETE FROM registered_groups WHERE jid = 'linear:__channel__'\").run()"`
+9. Delete `scripts/register-group.ts`
+10. Uninstall: `npm uninstall @linear/sdk` (in both root and container/agent-runner)
+11. Rebuild: `npm run build && cd container && ./build.sh`

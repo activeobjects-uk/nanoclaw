@@ -240,9 +240,21 @@ export class LinearChannel implements Channel {
     }
   }
 
-  async sendMessage(_jid: string, _text: string): Promise<void> {
-    // Linear agents communicate exclusively via MCP tools (mcp__linear__linear_add_comment).
-    // Posting the agent's text output as an auto-comment causes duplicate/narration noise.
+  async sendMessage(_jid: string, text: string): Promise<void> {
+    if (!this.client || !this.lastDeliveredIssueId) return;
+
+    try {
+      const result = await this.client.createComment({
+        issueId: this.lastDeliveredIssueId,
+        body: text,
+      });
+      const comment = await result.comment;
+      if (comment) {
+        this.botCommentIds.add(comment.id);
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to post Linear comment');
+    }
   }
 
   isConnected(): boolean {
