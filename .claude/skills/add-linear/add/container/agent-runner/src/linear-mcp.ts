@@ -4,6 +4,9 @@
  * Reads LINEAR_API_KEY from environment variable.
  */
 
+import fs from 'fs';
+import path from 'path';
+
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
@@ -337,6 +340,128 @@ server.tool(
     } catch (err) {
       return {
         content: [{ type: 'text' as const, text: `Error listing states: ${err instanceof Error ? err.message : String(err)}` }],
+        isError: true,
+      };
+    }
+  },
+);
+
+function getContentType(filename: string): string {
+  const types: Record<string, string> = {
+    '.md': 'text/markdown',
+    '.txt': 'text/plain',
+    '.pdf': 'application/pdf',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.json': 'application/json',
+    '.csv': 'text/csv',
+    '.html': 'text/html',
+    '.zip': 'application/zip',
+  };
+  return types[path.extname(filename).toLowerCase()] ?? 'application/octet-stream';
+}
+
+server.tool(
+  'linear_upload_file',
+  'Upload a file from the workspace and attach it to a Linear issue. File path is relative to /workspace/group/ or absolute.',
+  {
+    identifier: z.string().describe('Issue identifier (e.g., "ENG-123")'),
+    filePath: z.string().describe('File path relative to /workspace/group/ (e.g., "planning.md") or absolute'),
+    title: z.string().optional().describe('Attachment title (defaults to filename)'),
+  },
+  async (args) => {
+    try {
+      const resolvedPath = args.filePath.startsWith('/')
+        ? args.filePath
+        : path.join('/workspace/group', args.filePath);
+
+      if (!fs.existsSync(resolvedPath)) {
+        return {
+          content: [{ type: 'text' as const, text: `File not found: ${resolvedPath}` }],
+          isError: true,
+        };
+      }
+
+      const fileContent = fs.readFileSync(resolvedPath);
+      const fileName = path.basename(resolvedPath);
+      const contentType = getContentType(fileName);
+      const title = args.title ?? fileName;
+
+      // Step 1: Get presigned upload credentials from Linear
+      const uploadRes = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: { Authorization: LINEAR_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `mutation FileUpload($contentType: String!, $size: Int!, $filename: String!) {
+            fileUpload(contentType: $contentType, size: $size, filename: $filename) {
+              success
+              uploadFile { uploadUrl assetUrl headers { key value } }
+            }
+          }`,
+          variables: { contentType, size: fileContent.length, filename: fileName },
+        }),
+      });
+      const uploadData = await uploadRes.json() as any;
+      if (!uploadData.data?.fileUpload?.success) {
+        return {
+          content: [{ type: 'text' as const, text: `Failed to get upload credentials: ${JSON.stringify(uploadData.errors ?? uploadData)}` }],
+          isError: true,
+        };
+      }
+
+      const { uploadUrl, assetUrl, headers: uploadHeaders } = uploadData.data.fileUpload.uploadFile;
+
+      // Step 2: PUT file to S3
+      const putHeaders: Record<string, string> = { 'Content-Type': contentType };
+      for (const h of uploadHeaders) putHeaders[h.key] = h.value;
+
+      const putRes = await fetch(uploadUrl, { method: 'PUT', headers: putHeaders, body: fileContent });
+      if (!putRes.ok) {
+        return {
+          content: [{ type: 'text' as const, text: `S3 upload failed: ${putRes.status} ${putRes.statusText}` }],
+          isError: true,
+        };
+      }
+
+      // Step 3: Create attachment on the issue
+      const issue = await resolveIssue(args.identifier);
+      if (!issue) {
+        return {
+          content: [{ type: 'text' as const, text: `Issue "${args.identifier}" not found.` }],
+          isError: true,
+        };
+      }
+
+      const attachRes = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: { Authorization: LINEAR_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `mutation AttachmentCreate($input: AttachmentCreateInput!) {
+            attachmentCreate(input: $input) {
+              success
+              attachment { id url title }
+            }
+          }`,
+          variables: { input: { issueId: issue.id, url: assetUrl, title } },
+        }),
+      });
+      const attachData = await attachRes.json() as any;
+      if (!attachData.data?.attachmentCreate?.success) {
+        return {
+          content: [{ type: 'text' as const, text: `File uploaded but attachment creation failed: ${JSON.stringify(attachData.errors ?? attachData)}` }],
+          isError: true,
+        };
+      }
+
+      return {
+        content: [{ type: 'text' as const, text: `Attached "${fileName}" to ${args.identifier}.\nURL: ${assetUrl}` }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: 'text' as const, text: `Error uploading file: ${err instanceof Error ? err.message : String(err)}` }],
         isError: true,
       };
     }
