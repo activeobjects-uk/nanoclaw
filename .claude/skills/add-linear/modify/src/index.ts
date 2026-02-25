@@ -9,14 +9,9 @@ import {
   LINEAR_USER_ID,
   MAIN_GROUP_FOLDER,
   POLL_INTERVAL,
-  SLACK_APP_TOKEN,
-  SLACK_BOT_TOKEN,
-  SLACK_ONLY,
-  SLACK_TRIGGER,
   TRIGGER_PATTERN,
 } from './config.js';
 import { WhatsAppChannel } from './channels/whatsapp.js';
-import { SlackChannel } from './channels/slack.js';
 import { LinearChannel } from './channels/linear.js';
 import {
   ContainerOutput,
@@ -454,17 +449,9 @@ async function main(): Promise<void> {
   };
 
   // Create and connect channels
-  if (!SLACK_ONLY) {
-    whatsapp = new WhatsAppChannel(channelOpts);
-    channels.push(whatsapp);
-    await whatsapp.connect();
-  }
-
-  if (SLACK_BOT_TOKEN && SLACK_APP_TOKEN) {
-    const slack = new SlackChannel(SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_TRIGGER, channelOpts);
-    channels.push(slack);
-    await slack.connect();
-  }
+  whatsapp = new WhatsAppChannel(channelOpts);
+  channels.push(whatsapp);
+  await whatsapp.connect();
 
   if (LINEAR_API_KEY && LINEAR_USER_ID) {
     const linear = new LinearChannel(LINEAR_API_KEY, LINEAR_USER_ID, LINEAR_POLL_INTERVAL, channelOpts);

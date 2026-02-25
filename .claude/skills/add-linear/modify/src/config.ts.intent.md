@@ -12,10 +12,10 @@ Added three new configuration exports for Linear channel support.
 ## Invariants
 - All existing config exports remain unchanged
 - New Linear keys added to `readEnvFile([...])` call alongside existing keys
-- New exports appended at end of file after Slack config
+- New exports appended at end of file
 - No existing behavior modified — Linear config is additive only
 - LINEAR_POLL_INTERVAL uses `parseInt()` with fallback to '30000'
 
 ## Must-keep
-- All existing exports (ASSISTANT_NAME, POLL_INTERVAL, TRIGGER_PATTERN, SLACK_*, etc.)
+- All existing exports (ASSISTANT_NAME, POLL_INTERVAL, TRIGGER_PATTERN, etc.)
 - The readEnvFile pattern — ALL config from .env must go through this function
