@@ -1,8 +1,11 @@
 @echo off
-REM start-nanoclaw.bat — Start NanoClaw on Windows
-REM To stop: close this window or press Ctrl+C
+cd /d "%~dp0"
 
-cd /d "C:\Projects\nanoclaw"
+:: Kill any previously running NanoClaw processes
+powershell -NoProfile -Command ^
+  "$procs = Get-WmiObject Win32_Process | Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*nanoclaw*' };" ^
+  "if ($procs) { $procs | ForEach-Object { Write-Host ('Stopping existing NanoClaw process (PID ' + $_.ProcessId + ')'); $_.Terminate() } }"
 
-echo Starting NanoClaw...
-node dist\index.js
+:: Start NanoClaw using the full path so it's identifiable via wmic
+start /b node "%~dp0dist\index.js" >> logs\nanoclaw.log 2>> logs\nanoclaw.error.log
+echo NanoClaw started. Logs: logs\nanoclaw.log
