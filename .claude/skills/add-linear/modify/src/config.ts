@@ -80,3 +80,5 @@ export const LINEAR_POLL_INTERVAL = parseInt(
   process.env.LINEAR_POLL_INTERVAL || envConfig.LINEAR_POLL_INTERVAL || '30000',
   10,
 );
+export const GITHUB_TOKEN =
+  process.env.GITHUB_TOKEN || envConfig.GITHUB_TOKEN || '';

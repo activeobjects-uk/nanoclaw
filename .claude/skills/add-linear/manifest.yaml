@@ -6,8 +6,7 @@ adds:
   - src/channels/linear.ts
   - src/channels/linear.test.ts
   - container/agent-runner/src/linear-mcp.ts
-  - groups/linear/CLAUDE.md
-  - groups/linear/.claude/skills/manage-issues/SKILL.md
+  - groups/linear/CLAUDE.md  
   - groups/linear/.claude/skills/create-mockup/SKILL.md
 modifies:
   - src/config.ts
@@ -26,6 +25,7 @@ structured:
     - LINEAR_API_KEY
     - LINEAR_USER_ID
     - LINEAR_POLL_INTERVAL
+    - GITHUB_TOKEN
 conflicts: []
 depends: []
 test: "npx vitest run src/channels/linear.test.ts"

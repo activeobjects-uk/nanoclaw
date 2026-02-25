@@ -1,6 +1,7 @@
 import { LinearClient, Issue, Comment } from '@linear/sdk';
 
 import { ASSISTANT_NAME } from '../config.js';
+import { getRouterState, setRouterState } from '../db.js';
 import { logger } from '../logger.js';
 import {
   Channel,
@@ -46,6 +47,21 @@ export class LinearChannel implements Channel {
     this.opts = opts;
   }
 
+  private loadState(): void {
+    const raw = getRouterState('linear:processedIssues');
+    if (raw) {
+      const parsed = JSON.parse(raw) as Record<string, string>;
+      this.processedIssues = new Map(Object.entries(parsed));
+    }
+  }
+
+  private saveState(): void {
+    setRouterState(
+      'linear:processedIssues',
+      JSON.stringify(Object.fromEntries(this.processedIssues)),
+    );
+  }
+
   async connect(): Promise<void> {
     this.client = new LinearClient({ apiKey: this.apiKey });
 
@@ -60,14 +76,17 @@ export class LinearChannel implements Channel {
 
     this.connected = true;
 
-    // Silent initial poll — populate processedIssues without firing messages
-    await this.poll(true);
+    // Load persisted state so we can detect new issues assigned during downtime
+    this.loadState();
+
+    // First poll — delivers any issues assigned while offline
+    await this.poll();
 
     // Start polling loop
-    this.pollTimer = setInterval(() => this.poll(false), this.pollInterval);
+    this.pollTimer = setInterval(() => this.poll(), this.pollInterval);
   }
 
-  private async poll(silent: boolean): Promise<void> {
+  private async poll(): Promise<void> {
     if (!this.client) return;
 
     try {
@@ -89,17 +108,13 @@ export class LinearChannel implements Channel {
         if (!this.processedIssues.has(issueId)) {
           // New assignment
           this.processedIssues.set(issueId, updatedAt);
-          if (!silent) {
-            // Mark all existing comments as seen to avoid flooding
-            await this.markExistingComments(issue);
-            await this.deliverIssue(issue, 'assigned');
-          }
+          // Mark all existing comments as seen to avoid flooding
+          await this.markExistingComments(issue);
+          await this.deliverIssue(issue, 'assigned');
         } else if (updatedAt !== this.processedIssues.get(issueId)) {
           // Issue updated — check for new comments
           this.processedIssues.set(issueId, updatedAt);
-          if (!silent) {
-            await this.checkNewComments(issue);
-          }
+          await this.checkNewComments(issue);
         }
       }
 
@@ -119,6 +134,8 @@ export class LinearChannel implements Channel {
         const arr = [...this.botCommentIds];
         this.botCommentIds = new Set(arr.slice(-500));
       }
+
+      this.saveState();
     } catch (err) {
       logger.error({ err }, 'Linear poll error');
     }
@@ -223,35 +240,9 @@ export class LinearChannel implements Channel {
     }
   }
 
-  async sendMessage(_jid: string, text: string): Promise<void> {
-    if (!this.client) {
-      logger.warn('Linear client not initialized');
-      return;
-    }
-
-    const issueId = this.lastDeliveredIssueId;
-    if (!issueId) {
-      // Agent likely already commented via MCP tools — skip the auto-comment
-      logger.debug('sendMessage skipped — no lastDeliveredIssueId (agent may have used MCP tools directly)');
-      return;
-    }
-
-    try {
-      const payload = await this.client.createComment({
-        issueId,
-        body: text,
-      });
-
-      const comment = await payload.comment;
-      if (comment) {
-        this.botCommentIds.add(comment.id);
-        this.processedCommentIds.add(comment.id);
-      }
-
-      logger.info({ issueId }, 'Linear comment posted');
-    } catch (err) {
-      logger.error({ err, issueId }, 'Failed to post Linear comment');
-    }
+  async sendMessage(_jid: string, _text: string): Promise<void> {
+    // Linear agents communicate exclusively via MCP tools (mcp__linear__linear_add_comment).
+    // Posting the agent's text output as an auto-comment causes duplicate/narration noise.
   }
 
   isConnected(): boolean {

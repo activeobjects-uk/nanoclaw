@@ -16,6 +16,15 @@ vi.mock('../logger.js', () => ({
   },
 }));
 
+const mockRouterState = vi.hoisted(() => new Map<string, string>());
+
+vi.mock('../db.js', () => ({
+  getRouterState: vi.fn((key: string) => mockRouterState.get(key)),
+  setRouterState: vi.fn((key: string, value: string) => {
+    mockRouterState.set(key, value);
+  }),
+}));
+
 // --- @linear/sdk mock ---
 
 const mockIssues = vi.hoisted(() => ({
@@ -116,6 +125,7 @@ describe('LinearChannel', () => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: false });
     mockIssues.nodes = [];
+    mockRouterState.clear();
   });
 
   afterEach(() => {
@@ -167,7 +177,7 @@ describe('LinearChannel', () => {
   // --- Polling and issue detection ---
 
   describe('polling', () => {
-    it('silent initial poll does not fire onMessage', async () => {
+    it('first poll delivers new issues when no persisted state exists', async () => {
       const issue = createMockIssue();
       mockIssues.nodes = [issue];
 
@@ -176,7 +186,26 @@ describe('LinearChannel', () => {
 
       await channel.connect();
 
-      // After connect, the silent initial poll runs — no messages should be delivered
+      // With no persisted state, the first poll delivers issues as new assignments
+      expect(opts.onMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('first poll skips already-persisted issues', async () => {
+      const issue = createMockIssue();
+      mockIssues.nodes = [issue];
+
+      // Pre-populate persisted state with this issue
+      mockRouterState.set(
+        'linear:processedIssues',
+        JSON.stringify({ 'issue-1': '2024-06-01T12:00:00.000Z' }),
+      );
+
+      const opts = createTestOpts();
+      const channel = new LinearChannel('lin_api_key', 'user-bot-123', 30000, opts);
+
+      await channel.connect();
+
+      // Issue was already in persisted state with same updatedAt — no delivery
       expect(opts.onMessage).not.toHaveBeenCalled();
     });
 
@@ -414,7 +443,7 @@ describe('LinearChannel', () => {
       const opts = createTestOpts();
       const channel = new LinearChannel('lin_api_key', 'user-bot-123', 60000, opts);
 
-      // Connect (silent poll), then trigger assignment
+      // Connect (empty poll), then trigger assignment
       mockIssues.nodes = [];
       await channel.connect();
       mockIssues.nodes = [issue];
