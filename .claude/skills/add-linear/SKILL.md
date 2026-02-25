@@ -37,10 +37,6 @@ curl.exe -s -H "Authorization: <API_KEY>" \
   https://api.linear.app/graphql
 ```
 
-AskUserQuestion: Should Linear be the only channel (disable WhatsApp)?
-- **No** (default) — Linear runs alongside existing channels
-- **Yes** — Sets `LINEAR_ONLY=true`
-
 ## Phase 2: Apply Code Changes
 
 ### Initialize skills system (if needed)
@@ -62,7 +58,7 @@ This deterministically:
 - Adds `src/channels/linear.test.ts` (unit tests)
 - Adds `container/agent-runner/src/linear-mcp.ts` (MCP server with Linear tools)
 - Adds `groups/linear/CLAUDE.md` (dedicated group instructions)
-- Merges Linear config into `src/config.ts` (`LINEAR_API_KEY`, `LINEAR_USER_ID`, `LINEAR_POLL_INTERVAL`, `LINEAR_ONLY`)
+- Merges Linear config into `src/config.ts` (`LINEAR_API_KEY`, `LINEAR_USER_ID`, `LINEAR_POLL_INTERVAL`)
 - Merges Linear channel creation into `src/index.ts`
 - Adds `LINEAR_API_KEY` to `readSecrets()` in `src/container-runner.ts`
 - Registers Linear MCP server in `container/agent-runner/src/index.ts`
@@ -86,11 +82,6 @@ Add to `.env`:
 LINEAR_API_KEY=<your-api-key>
 LINEAR_USER_ID=<your-user-id>
 LINEAR_POLL_INTERVAL=30000
-```
-
-If replacing WhatsApp:
-```bash
-LINEAR_ONLY=true
 ```
 
 Sync to container environment:
@@ -166,11 +157,10 @@ Linear allows ~1500 API requests/hour. At 30s polling with ~3-5 calls per cycle,
 1. Delete `src/channels/linear.ts` and `src/channels/linear.test.ts`
 2. Delete `container/agent-runner/src/linear-mcp.ts`
 3. Remove `LinearChannel` import and creation from `src/index.ts`
-4. Restore unconditional WhatsApp creation (remove `!LINEAR_ONLY` guard)
-5. Remove Linear config exports from `src/config.ts` and `readEnvFile` call
-6. Remove `LINEAR_API_KEY` from `readSecrets()` in `src/container-runner.ts`
-7. Remove Linear MCP from `container/agent-runner/src/index.ts`
-8. Remove `'mcp__linear__*'` from `allowedTools`
-9. Remove Linear registration: `sqlite3 store/messages.db "DELETE FROM registered_groups WHERE jid = 'linear:__channel__'"`
-10. Uninstall: `npm uninstall @linear/sdk` (in both root and container/agent-runner)
-11. Rebuild: `npm run build && cd container && ./build.sh`
+4. Remove Linear config exports from `src/config.ts` and `readEnvFile` call
+5. Remove `LINEAR_API_KEY` from `readSecrets()` in `src/container-runner.ts`
+6. Remove Linear MCP from `container/agent-runner/src/index.ts`
+7. Remove `'mcp__linear__*'` from `allowedTools`
+8. Remove Linear registration: `sqlite3 store/messages.db "DELETE FROM registered_groups WHERE jid = 'linear:__channel__'"`
+9. Uninstall: `npm uninstall @linear/sdk` (in both root and container/agent-runner)
+10. Rebuild: `npm run build && cd container && ./build.sh`

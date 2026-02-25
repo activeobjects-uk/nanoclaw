@@ -16,7 +16,6 @@ const envConfig = readEnvFile([
   'LINEAR_API_KEY',
   'LINEAR_USER_ID',
   'LINEAR_POLL_INTERVAL',
-  'LINEAR_ONLY',
 ]);
 
 export const ASSISTANT_NAME =
@@ -95,5 +94,3 @@ export const LINEAR_POLL_INTERVAL = parseInt(
   process.env.LINEAR_POLL_INTERVAL || envConfig.LINEAR_POLL_INTERVAL || '30000',
   10,
 );
-export const LINEAR_ONLY =
-  (process.env.LINEAR_ONLY || envConfig.LINEAR_ONLY) === 'true';

@@ -4,9 +4,8 @@
 Added Linear channel instantiation and import. Linear runs alongside existing channels.
 
 ## Key sections
-- **Imports**: Add `LinearChannel` from `./channels/linear.js` and `LINEAR_API_KEY`, `LINEAR_USER_ID`, `LINEAR_POLL_INTERVAL`, `LINEAR_ONLY` from `./config.js`
+- **Imports**: Add `LinearChannel` from `./channels/linear.js` and `LINEAR_API_KEY`, `LINEAR_USER_ID`, `LINEAR_POLL_INTERVAL` from `./config.js`
 - **Channel creation**: After the Slack block, conditionally create LinearChannel if `LINEAR_API_KEY && LINEAR_USER_ID` are set
-- **WhatsApp guard**: Update to `if (!SLACK_ONLY && !LINEAR_ONLY)` so LINEAR_ONLY also suppresses WhatsApp
 
 ## Invariants
 - All existing message loop logic unchanged
@@ -14,7 +13,7 @@ Added Linear channel instantiation and import. Linear runs alongside existing ch
 - State management unchanged
 - All channels added to the `channels` array for proper shutdown
 - Linear channel creation is fully conditional on env vars being set
-- WhatsApp guard includes both SLACK_ONLY and LINEAR_ONLY
+- WhatsApp guard is NOT modified — Linear always runs alongside other channels
 
 ## Must-keep
 - All existing imports and channel creation logic

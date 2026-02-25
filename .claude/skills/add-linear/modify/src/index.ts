@@ -5,7 +5,6 @@ import {
   ASSISTANT_NAME,
   IDLE_TIMEOUT,
   LINEAR_API_KEY,
-  LINEAR_ONLY,
   LINEAR_POLL_INTERVAL,
   LINEAR_USER_ID,
   MAIN_GROUP_FOLDER,
@@ -455,7 +454,7 @@ async function main(): Promise<void> {
   };
 
   // Create and connect channels
-  if (!SLACK_ONLY && !LINEAR_ONLY) {
+  if (!SLACK_ONLY) {
     whatsapp = new WhatsAppChannel(channelOpts);
     channels.push(whatsapp);
     await whatsapp.connect();

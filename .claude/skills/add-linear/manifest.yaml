@@ -26,7 +26,6 @@ structured:
     - LINEAR_API_KEY
     - LINEAR_USER_ID
     - LINEAR_POLL_INTERVAL
-    - LINEAR_ONLY
 conflicts: []
 depends: []
 test: "npx vitest run src/channels/linear.test.ts"
