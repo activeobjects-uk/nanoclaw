@@ -15,7 +15,7 @@ Run `/setup` before this skill. The container must be built and Claude authentic
 
 ### Check if already applied
 
-Read `.nanoclaw/state.yaml`. If `linear` is in `applied_skills`, skip to Phase 3 (Setup).
+Read `.nanoclaw/state.yaml`. If `linear` is in `applied_skills`, skip to Phase 3 (Setup). The code changes are already in place.
 
 ### Ask the user
 
@@ -47,6 +47,8 @@ If `.nanoclaw/` directory doesn't exist:
 npx tsx scripts/apply-skill.ts --init
 ```
 
+Or call `initSkillsSystem()` from `skills-engine/migrate.ts`.
+
 ### Apply the skill
 
 ```bash
@@ -60,10 +62,15 @@ This deterministically:
 - Adds `groups/linear/CLAUDE.md` (dedicated group instructions)
 - Merges Linear config into `src/config.ts` (`LINEAR_API_KEY`, `LINEAR_USER_ID`, `LINEAR_POLL_INTERVAL`)
 - Merges Linear channel creation into `src/index.ts`
-- Adds `LINEAR_API_KEY` to `readSecrets()` in `src/container-runner.ts`
+- Adds `LINEAR_API_KEY` and `GITHUB_TOKEN` to `readSecrets()` in `src/container-runner.ts`
 - Registers Linear MCP server in `container/agent-runner/src/index.ts`
 - Installs `@linear/sdk` npm dependency in both host and container
 - Updates `.env.example`
+- Records the application in `.nanoclaw/state.yaml`
+
+If the apply reports merge conflicts, read the intent files:
+- `modify/src/index.ts.intent.md` — what changed and invariants for index.ts
+- `modify/src/config.ts.intent.md` — what changed for config.ts
 
 ### Validate
 
@@ -71,6 +78,8 @@ This deterministically:
 npm test
 npm run build
 ```
+
+All tests must pass (including the new Linear tests) and build must be clean before proceeding.
 
 ## Phase 3: Setup
 
@@ -82,12 +91,18 @@ Add to `.env`:
 LINEAR_API_KEY=<your-api-key>
 LINEAR_USER_ID=<your-user-id>
 LINEAR_POLL_INTERVAL=30000
+GITHUB_TOKEN=<your-github-token>
 ```
 
+`GITHUB_TOKEN` is optional but recommended — the Linear agent uses it to publish HTML mockups as GitHub Gists via the `create-mockup` skill. Create a [Personal Access Token](https://github.com/settings/tokens) with the `gist` scope. If omitted, mockups will be attached as files to the Linear issue instead.
+
 Sync to container environment:
+
 ```bash
 mkdir -p data/env && cp .env data/env/env
 ```
+
+The container reads environment from `data/env/env`, not `.env` directly.
 
 ### Register the Linear group
 
@@ -105,10 +120,22 @@ The sentinel JID `linear:__channel__` routes all Linear issues to the `linear` g
 ```bash
 npm run build
 cd container && ./build.sh && cd ..
+```
+
+Restart the service:
+
+```bash
+# macOS (launchd)
+launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+
+# Linux (systemd)
+systemctl --user restart nanoclaw
+
+# Windows (or if service not yet configured)
 npx tsx setup/index.ts --step service
 ```
 
-## Phase 4: Verification
+## Phase 4: Verify
 
 ### Test the connection
 
@@ -123,7 +150,27 @@ npx tsx setup/index.ts --step service
 tail -f logs/nanoclaw.log | grep -i linear
 ```
 
-## Phase 5: Troubleshooting
+## After Setup
+
+If running `npm run dev` while the service is active:
+
+```bash
+# macOS:
+launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
+npm run dev
+# When done testing:
+launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
+
+# Linux:
+# systemctl --user stop nanoclaw
+# npm run dev
+# systemctl --user start nanoclaw
+
+# Windows:
+# Stop the service before running dev, then restart after
+```
+
+## Troubleshooting
 
 ### Agent not picking up issues
 
