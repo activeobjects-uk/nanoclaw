@@ -95,11 +95,11 @@ Remove sections that aren't relevant. Add sections that are.
 
 ### 5. Attach to Linear
 
-Use `mcp__linear__linear_upload_file` to upload the document:
+Use `mcp__linear__linear_create_document` to create the document directly in Linear (shows as a document icon in the issue Resources section, not a URL link):
 ```
-filePath: issues/{IDENTIFIER}-plan.md
 identifier: {IDENTIFIER}
 title: Research Plan — {Issue Title}
+filePath: issues/{IDENTIFIER}-plan.md
 ```
 
 ### 6. Post a summary comment

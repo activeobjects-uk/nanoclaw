@@ -165,10 +165,20 @@ function buildVolumeMounts(
   // Copy agent-runner source into a per-group writable location so agents
   // can customize it (add tools, change behavior) without affecting other
   // groups. Recompiled on container startup via entrypoint.sh.
+  // Canonical files are synced on every run (newer mtime wins) so upstream
+  // changes to MCP tools are propagated without wiping group customizations.
   const agentRunnerSrc = path.join(projectRoot, 'container', 'agent-runner', 'src');
   const groupAgentRunnerDir = path.join(DATA_DIR, 'sessions', group.folder, 'agent-runner-src');
-  if (!fs.existsSync(groupAgentRunnerDir) && fs.existsSync(agentRunnerSrc)) {
-    fs.cpSync(agentRunnerSrc, groupAgentRunnerDir, { recursive: true });
+  if (fs.existsSync(agentRunnerSrc)) {
+    fs.mkdirSync(groupAgentRunnerDir, { recursive: true });
+    for (const entry of fs.readdirSync(agentRunnerSrc, { withFileTypes: true })) {
+      const srcFile = path.join(agentRunnerSrc, entry.name);
+      const dstFile = path.join(groupAgentRunnerDir, entry.name);
+      if (!entry.isFile()) continue;
+      if (!fs.existsSync(dstFile) || fs.statSync(srcFile).mtimeMs > fs.statSync(dstFile).mtimeMs) {
+        fs.copyFileSync(srcFile, dstFile);
+      }
+    }
   }
   mounts.push({
     hostPath: groupAgentRunnerDir,

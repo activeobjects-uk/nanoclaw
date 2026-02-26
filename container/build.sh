@@ -7,13 +7,22 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 IMAGE_NAME="nanoclaw-agent"
-TAG="${1:-latest}"
+TAG="latest"
+NO_CACHE=""
+
+for arg in "$@"; do
+  case "$arg" in
+    --no-cache) NO_CACHE="--no-cache" ;;
+    *) TAG="$arg" ;;
+  esac
+done
+
 CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-docker}"
 
 echo "Building NanoClaw agent container image..."
 echo "Image: ${IMAGE_NAME}:${TAG}"
 
-${CONTAINER_RUNTIME} build -t "${IMAGE_NAME}:${TAG}" .
+${CONTAINER_RUNTIME} build ${NO_CACHE} -t "${IMAGE_NAME}:${TAG}" .
 
 echo ""
 echo "Build complete!"

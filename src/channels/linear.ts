@@ -1,4 +1,4 @@
-import { LinearClient, Issue, Comment } from '@linear/sdk';
+import { LinearClient, Issue } from '@linear/sdk';
 
 import { ASSISTANT_NAME } from '../config.js';
 import { getRouterState, setRouterState } from '../db.js';
@@ -136,6 +136,9 @@ export class LinearChannel implements Channel {
       }
 
       this.saveState();
+
+      // Check for @mentions in issues not assigned to the bot
+      await this.pollMentions();
     } catch (err) {
       logger.error({ err }, 'Linear poll error');
     }
@@ -199,6 +202,98 @@ export class LinearChannel implements Channel {
       { identifier: issue.identifier, trigger },
       'Linear issue delivered',
     );
+  }
+
+  private async pollMentions(): Promise<void> {
+    if (!this.client) return;
+
+    try {
+      const res = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: {
+          Authorization: this.apiKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          query: `
+            query {
+              notifications(
+                filter: { type: { in: ["issueCommentMention"] } }
+                first: 50
+              ) {
+                nodes {
+                  id
+                  type
+                  readAt
+                  ... on IssueCommentMentionNotification {
+                    comment {
+                      id
+                      body
+                      createdAt
+                      user { id name displayName }
+                      issue {
+                        id
+                        identifier
+                        title
+                        url
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          `,
+        }),
+      });
+
+      const data = (await res.json()) as any;
+      const notifications: any[] = data?.data?.notifications?.nodes ?? [];
+
+      for (const notification of notifications) {
+        if (notification.type !== 'issueCommentMention') continue;
+
+        const comment = notification.comment;
+        if (!comment) continue;
+
+        if (this.processedCommentIds.has(comment.id)) continue;
+        this.processedCommentIds.add(comment.id);
+
+        if (comment.user?.id === this.userId) continue;
+
+        const issue = comment.issue;
+        if (!issue) continue;
+
+        // Skip issues already tracked via assignment — checkNewComments handles those
+        if (this.processedIssues.has(issue.id)) continue;
+
+        const commentUser = comment.user;
+        const timestamp = comment.createdAt;
+
+        this.opts.onMessage(LINEAR_CHANNEL_JID, {
+          id: comment.id,
+          chat_jid: LINEAR_CHANNEL_JID,
+          sender: commentUser?.id ?? 'linear',
+          sender_name: commentUser?.displayName || commentUser?.name || 'Linear',
+          content: [
+            `@${ASSISTANT_NAME} [Mentioned in ${issue.identifier} (commentId: ${comment.id})]`,
+            `Issue: ${issue.identifier} — ${issue.title}`,
+            `URL: ${issue.url}`,
+            ``,
+            comment.body,
+          ].join('\n'),
+          timestamp,
+          is_from_me: false,
+          is_bot_message: false,
+        });
+
+        logger.info(
+          { identifier: issue.identifier, commentUser: commentUser?.name },
+          'Linear @mention delivered',
+        );
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to poll Linear @mentions');
+    }
   }
 
   private async checkNewComments(issue: Issue): Promise<void> {

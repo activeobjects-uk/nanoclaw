@@ -469,6 +469,78 @@ server.tool(
 );
 
 server.tool(
+  'linear_create_document',
+  'Create a Linear document from a file and associate it with an issue. The document appears in the issue Resources section with a document icon (unlike attachmentCreate which shows a link icon). Use this to attach planning documents, research notes, and any markdown files to issues.',
+  {
+    identifier: z.string().describe('Issue identifier (e.g., "ENG-123")'),
+    title: z.string().describe('Document title shown in the Resources section'),
+    filePath: z.string().describe('File path relative to /workspace/group/ (e.g., "issues/ENG-123-plan.md") or absolute'),
+  },
+  async (args) => {
+    try {
+      const resolvedPath = args.filePath.startsWith('/')
+        ? args.filePath
+        : path.join('/workspace/group', args.filePath);
+
+      if (!fs.existsSync(resolvedPath)) {
+        return {
+          content: [{ type: 'text' as const, text: `File not found: ${resolvedPath}` }],
+          isError: true,
+        };
+      }
+
+      const content = fs.readFileSync(resolvedPath, 'utf-8');
+
+      const issue = await resolveIssue(args.identifier);
+      if (!issue) {
+        return {
+          content: [{ type: 'text' as const, text: `Issue "${args.identifier}" not found.` }],
+          isError: true,
+        };
+      }
+
+      const docRes = await fetch('https://api.linear.app/graphql', {
+        method: 'POST',
+        headers: { Authorization: LINEAR_API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: `mutation DocumentCreate($input: DocumentCreateInput!) {
+            documentCreate(input: $input) {
+              success
+              document { id title url }
+            }
+          }`,
+          variables: {
+            input: {
+              title: args.title,
+              content,
+              issueId: issue.id,
+            },
+          },
+        }),
+      });
+
+      const docData = await docRes.json() as any;
+      if (!docData.data?.documentCreate?.success) {
+        return {
+          content: [{ type: 'text' as const, text: `Failed to create document: ${JSON.stringify(docData.errors ?? docData)}` }],
+          isError: true,
+        };
+      }
+
+      const doc = docData.data.documentCreate.document;
+      return {
+        content: [{ type: 'text' as const, text: `Document "${doc.title}" created and linked to ${args.identifier}.\nURL: ${doc.url}` }],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: 'text' as const, text: `Error creating document: ${err instanceof Error ? err.message : String(err)}` }],
+        isError: true,
+      };
+    }
+  },
+);
+
+server.tool(
   'linear_download_attachment',
   'Download an image or file from a Linear URL (which requires authentication). Saves it locally so you can view it with the Read tool.',
   {
