@@ -14,14 +14,11 @@ modifies:
   - src/index.ts
   - src/container-runner.ts
   - container/agent-runner/src/index.ts
-  - container/agent-runner/package.json
-  - package.json
+  - container/agent-runner/package.json  
   - .env.example
 structured:
   npm_dependencies:
-    "@linear/sdk": "^75.0.0"
-  container_npm_dependencies:
-    "@linear/sdk": "^75.0.0"
+    "@linear/sdk": "^75.0.0" 
   env_additions:
     - LINEAR_API_KEY
     - LINEAR_USER_ID

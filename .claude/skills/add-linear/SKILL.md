@@ -60,18 +60,22 @@ This deterministically:
 - Adds `src/channels/linear.test.ts` (unit tests)
 - Adds `container/agent-runner/src/linear-mcp.ts` (MCP server with Linear tools)
 - Adds `groups/linear/CLAUDE.md` (dedicated group instructions)
+- Adds `groups/linear/.claude/skills/create-mockup/SKILL.md` (mockup publishing skill for the Linear agent)
 - Adds `scripts/register-group.ts` (cross-platform group registration utility)
-- Merges Linear config into `src/config.ts` (`LINEAR_API_KEY`, `LINEAR_USER_ID`, `LINEAR_POLL_INTERVAL`)
-- Merges Linear channel creation into `src/index.ts`
-- Adds `LINEAR_API_KEY` and `GITHUB_TOKEN` to `readSecrets()` in `src/container-runner.ts`
-- Registers Linear MCP server in `container/agent-runner/src/index.ts`
-- Installs `@linear/sdk` npm dependency in both host and container
-- Updates `.env.example`
+- Three-way merges Linear config into `src/config.ts` (`LINEAR_API_KEY`, `LINEAR_USER_ID`, `LINEAR_POLL_INTERVAL`)
+- Three-way merges Linear channel creation into `src/index.ts`
+- Three-way merges Linear secrets into `src/container-runner.ts` (`LINEAR_API_KEY`, `GITHUB_TOKEN`)
+- Three-way merges Linear MCP server into `container/agent-runner/src/index.ts`
+- Three-way merges Linear dependency into `container/agent-runner/package.json`
+- Installs `@linear/sdk` npm dependency
+- Three-way merges Linear env vars into `.env.example`
 - Records the application in `.nanoclaw/state.yaml`
 
 If the apply reports merge conflicts, read the intent files:
 - `modify/src/index.ts.intent.md` — what changed and invariants for index.ts
 - `modify/src/config.ts.intent.md` — what changed for config.ts
+- `modify/src/container-runner.ts.intent.md` — what changed for container-runner.ts
+- `modify/container/agent-runner/src/index.ts.intent.md` — what changed for the agent-runner entry point
 
 ### Validate
 
@@ -201,12 +205,13 @@ Linear allows ~1500 API requests/hour. At 30s polling with ~3-5 calls per cycle,
 
 1. Delete `src/channels/linear.ts` and `src/channels/linear.test.ts`
 2. Delete `container/agent-runner/src/linear-mcp.ts`
-3. Remove `LinearChannel` import and creation from `src/index.ts`
-4. Remove Linear config exports from `src/config.ts` and `readEnvFile` call
-5. Remove `LINEAR_API_KEY` from `readSecrets()` in `src/container-runner.ts`
-6. Remove Linear MCP from `container/agent-runner/src/index.ts`
-7. Remove `'mcp__linear__*'` from `allowedTools`
-8. Remove Linear registration — delete from DB via Node: `node -e "require('./src/db.js').db.prepare(\"DELETE FROM registered_groups WHERE jid = 'linear:__channel__'\").run()"`
-9. Delete `scripts/register-group.ts`
-10. Uninstall: `npm uninstall @linear/sdk` (in both root and container/agent-runner)
-11. Rebuild: `npm run build && cd container && ./build.sh`
+3. Delete `groups/linear/` directory (includes `CLAUDE.md` and `create-mockup` skill)
+4. Remove `LinearChannel` import and creation from `src/index.ts`
+5. Remove Linear config exports from `src/config.ts` and `readEnvFile` call
+6. Remove `LINEAR_API_KEY` from `readSecrets()` in `src/container-runner.ts`
+7. Remove Linear MCP from `container/agent-runner/src/index.ts`
+8. Remove `'mcp__linear__*'` from `allowedTools`
+9. Remove Linear registration — delete from DB via: `npx tsx -e 'import { db } from "./src/db.js"; db.prepare("DELETE FROM registered_groups WHERE jid = ?").run("linear:__channel__")'`
+10. Delete `scripts/register-group.ts`
+11. Uninstall: `npm uninstall @linear/sdk` (in both root and container/agent-runner)
+12. Rebuild: `npm run build && cd container && ./build.sh`

@@ -4,11 +4,15 @@ import path from 'path';
 import {
   ASSISTANT_NAME,
   IDLE_TIMEOUT,
+  LINEAR_API_KEY,
+  LINEAR_POLL_INTERVAL,
+  LINEAR_USER_ID,
   MAIN_GROUP_FOLDER,
   POLL_INTERVAL,
   TRIGGER_PATTERN,
 } from './config.js';
 import { WhatsAppChannel } from './channels/whatsapp.js';
+import { LinearChannel } from './channels/linear.js';
 import {
   ContainerOutput,
   runContainerAgent,
@@ -421,6 +425,7 @@ function ensureContainerSystemRunning(): void {
 }
 
 async function main(): Promise<void> {
+  process.title = 'nanoclaw';
   ensureContainerSystemRunning();
   initDatabase();
   logger.info('Database initialized');
@@ -448,6 +453,12 @@ async function main(): Promise<void> {
   whatsapp = new WhatsAppChannel(channelOpts);
   channels.push(whatsapp);
   await whatsapp.connect();
+
+  if (LINEAR_API_KEY && LINEAR_USER_ID) {
+    const linear = new LinearChannel(LINEAR_API_KEY, LINEAR_USER_ID, LINEAR_POLL_INTERVAL, channelOpts);
+    channels.push(linear);
+    await linear.connect();
+  }
 
   // Start subsystems (independently of connection handler)
   startSchedulerLoop({

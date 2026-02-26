@@ -12,6 +12,8 @@ Linear MCP tools:
 - `mcp__linear__linear_create_issue` — Create a new issue
 - `mcp__linear__linear_list_teams` — List all teams (for finding team IDs)
 - `mcp__linear__linear_list_states` — List workflow states (for finding state IDs)
+- `mcp__linear__linear_download_attachment` — Download images/files from Linear URLs (they require auth)
+- `mcp__linear__linear_upload_file` — Upload a file and attach it to an issue
 
 ## Workflow
 
@@ -26,11 +28,14 @@ When you receive a comment update on an existing issue:
 1. Read the new comment in context
 2. Respond appropriately — answer questions, provide updates, or take action
 
+When an issue or comment contains images (Linear upload URLs):
+1. Use `mcp__linear__linear_download_attachment` to download the image first
+2. Then use the Read tool to view the downloaded file
+3. The images will be saved to `downloads/` in your workspace
+
 ## Communication
 
-Your text output is automatically posted as a comment on the Linear issue. Be concise and technical. Use markdown formatting.
-
-For precise control over which issue gets a comment, use `mcp__linear__linear_add_comment` directly.
+Your text output is NOT automatically posted to Linear. You MUST use `mcp__linear__linear_add_comment` to post comments on issues. Always post a comment when acknowledging, updating, or completing work on an issue.
 
 ## Memory
 

@@ -425,6 +425,7 @@ function ensureContainerSystemRunning(): void {
 }
 
 async function main(): Promise<void> {
+  process.title = 'nanoclaw';
   ensureContainerSystemRunning();
   initDatabase();
   logger.info('Database initialized');

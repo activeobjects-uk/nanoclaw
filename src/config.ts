@@ -9,13 +9,16 @@ import { readEnvFile } from './env.js';
 const envConfig = readEnvFile([
   'ASSISTANT_NAME',
   'ASSISTANT_HAS_OWN_NUMBER',
+  'LINEAR_API_KEY',
+  'LINEAR_USER_ID',
+  'LINEAR_POLL_INTERVAL',
 ]);
 
 export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';
 export const ASSISTANT_HAS_OWN_NUMBER =
   (process.env.ASSISTANT_HAS_OWN_NUMBER || envConfig.ASSISTANT_HAS_OWN_NUMBER) === 'true';
-export const POLL_INTERVAL = 2000;
+export const POLL_INTERVAL = 500;
 export const SCHEDULER_POLL_INTERVAL = 60000;
 
 // Absolute paths needed for container mounts
@@ -67,3 +70,15 @@ export const TRIGGER_PATTERN = new RegExp(
 // Uses system timezone by default
 export const TIMEZONE =
   process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+// Linear configuration
+export const LINEAR_API_KEY =
+  process.env.LINEAR_API_KEY || envConfig.LINEAR_API_KEY || '';
+export const LINEAR_USER_ID =
+  process.env.LINEAR_USER_ID || envConfig.LINEAR_USER_ID || '';
+export const LINEAR_POLL_INTERVAL = parseInt(
+  process.env.LINEAR_POLL_INTERVAL || envConfig.LINEAR_POLL_INTERVAL || '30000',
+  10,
+);
+export const GITHUB_TOKEN =
+  process.env.GITHUB_TOKEN || envConfig.GITHUB_TOKEN || '';
