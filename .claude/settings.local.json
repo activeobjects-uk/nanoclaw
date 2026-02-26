@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/Projects/nanoclaw && npx tsx setup/index.ts --step service 2>&1)",
+      "Bash(npx tsx scripts/apply-skill.ts --init)"
+    ]
+  }
+}

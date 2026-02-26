@@ -31,10 +31,10 @@ export function isRoot(): boolean {
 
 export function isHeadless(): boolean {
   // No display server available
-  if (getPlatform() === 'linux') {
+  if (os.platform() === 'linux') {
     return !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
   }
-  // macOS is never headless in practice (even SSH sessions can open URLs)
+  // macOS and Windows are never headless in practice
   return false;
 }
 
@@ -55,9 +55,13 @@ export function hasSystemd(): boolean {
  */
 export function openBrowser(url: string): boolean {
   try {
-    const platform = getPlatform();
-    if (platform === 'macos') {
+    const platform = os.platform();
+    if (platform === 'darwin') {
       execSync(`open ${JSON.stringify(url)}`, { stdio: 'ignore' });
+      return true;
+    }
+    if (platform === 'win32') {
+      execSync(`start "" ${JSON.stringify(url)}`, { stdio: 'ignore', shell: true });
       return true;
     }
     if (platform === 'linux') {
@@ -106,7 +110,11 @@ export function getNodePath(): string {
 
 export function commandExists(name: string): boolean {
   try {
-    execSync(`command -v ${name}`, { stdio: 'ignore' });
+    if (os.platform() === 'win32') {
+      execSync(`where ${name}`, { stdio: 'ignore', shell: true });
+    } else {
+      execSync(`command -v ${name}`, { stdio: 'ignore' });
+    }
     return true;
   } catch {
     return false;

@@ -1,0 +1,30 @@
+skill: linear
+version: 1.0.0
+description: "Linear issue tracking integration with polling-based triggers and MCP tools"
+core_version: 0.1.0
+adds:
+  - src/channels/linear.ts
+  - src/channels/linear.test.ts
+  - container/agent-runner/src/linear-mcp.ts
+  - groups/linear/CLAUDE.md  
+  - groups/linear/.claude/skills/create-mockup/SKILL.md
+  - groups/linear/.claude/skills/research-plan/SKILL.md
+  - scripts/register-group.ts
+modifies:
+  - src/config.ts
+  - src/index.ts
+  - src/container-runner.ts
+  - container/agent-runner/src/index.ts
+  - container/agent-runner/package.json  
+  - .env.example
+structured:
+  npm_dependencies:
+    "@linear/sdk": "^75.0.0" 
+  env_additions:
+    - LINEAR_API_KEY
+    - LINEAR_USER_ID
+    - LINEAR_POLL_INTERVAL
+    - GITHUB_TOKEN
+conflicts: []
+depends: []
+test: "npx vitest run src/channels/linear.test.ts"
