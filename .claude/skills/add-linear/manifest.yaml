@@ -25,6 +25,7 @@ structured:
     - LINEAR_USER_ID
     - LINEAR_POLL_INTERVAL
     - GITHUB_TOKEN
+    - LINEAR_ALLOWED_USERS
 conflicts: []
 depends: []
 test: "npx vitest run src/channels/linear.test.ts"

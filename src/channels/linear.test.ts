@@ -2,9 +2,12 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
 // --- Mocks ---
 
+const mockAllowedUsers = vi.hoisted(() => ({ value: [] as string[] }));
+
 vi.mock('../config.js', () => ({
   ASSISTANT_NAME: 'Andy',
   TRIGGER_PATTERN: /^@Andy\b/i,
+  get LINEAR_ALLOWED_USERS() { return mockAllowedUsers.value; },
 }));
 
 vi.mock('../logger.js', () => ({
@@ -83,6 +86,7 @@ function createMockIssue(overrides?: Partial<{
   description: string;
   url: string;
   priority: number;
+  creatorId: string;
   updatedAt: Date;
   state: { name: string };
   labels: { nodes: { name: string }[] };
@@ -95,6 +99,7 @@ function createMockIssue(overrides?: Partial<{
     description: 'The login page crashes on Safari',
     url: 'https://linear.app/team/issue/ENG-123',
     priority: 2,
+    creatorId: 'creator-user-1',
     updatedAt: new Date('2024-06-01T12:00:00Z'),
   };
 
@@ -107,6 +112,7 @@ function createMockIssue(overrides?: Partial<{
     description: merged.description,
     url: merged.url,
     priority: merged.priority,
+    creatorId: merged.creatorId,
     updatedAt: merged.updatedAt,
     state: Promise.resolve(overrides?.state ?? { name: 'Todo' }),
     labels: vi.fn().mockResolvedValue(
@@ -126,6 +132,7 @@ describe('LinearChannel', () => {
     vi.useFakeTimers({ shouldAdvanceTime: false });
     mockIssues.nodes = [];
     mockRouterState.clear();
+    mockAllowedUsers.value = [];
   });
 
   afterEach(() => {
@@ -534,6 +541,161 @@ describe('LinearChannel', () => {
 
       // Channel should still be connected
       expect(channel.isConnected()).toBe(true);
+
+      await channel.disconnect();
+    });
+  });
+
+  // --- Allowed users filtering ---
+
+  describe('allowed users filtering', () => {
+    it('delivers issue when LINEAR_ALLOWED_USERS is empty (feature disabled)', async () => {
+      mockAllowedUsers.value = [];
+
+      const issue = createMockIssue({ creatorId: 'any-user' });
+      mockIssues.nodes = [issue];
+
+      const opts = createTestOpts();
+      const channel = new LinearChannel('lin_api_key', 'user-bot-123', 30000, opts);
+      await channel.connect();
+
+      expect(opts.onMessage).toHaveBeenCalledTimes(1);
+      await channel.disconnect();
+    });
+
+    it('delivers issue when creator is in LINEAR_ALLOWED_USERS', async () => {
+      mockAllowedUsers.value = ['allowed-user-1'];
+
+      const issue = createMockIssue({ creatorId: 'allowed-user-1' });
+      mockIssues.nodes = [issue];
+
+      const opts = createTestOpts();
+      const channel = new LinearChannel('lin_api_key', 'user-bot-123', 30000, opts);
+      await channel.connect();
+
+      expect(opts.onMessage).toHaveBeenCalledTimes(1);
+      await channel.disconnect();
+    });
+
+    it('skips issue when creator is NOT in LINEAR_ALLOWED_USERS', async () => {
+      mockAllowedUsers.value = ['allowed-user-1'];
+
+      const issue = createMockIssue({ creatorId: 'blocked-user-2' });
+      mockIssues.nodes = [issue];
+
+      const opts = createTestOpts();
+      const channel = new LinearChannel('lin_api_key', 'user-bot-123', 30000, opts);
+      await channel.connect();
+
+      expect(opts.onMessage).not.toHaveBeenCalled();
+      await channel.disconnect();
+    });
+
+    it('still tracks filtered issues in processedIssues', async () => {
+      mockAllowedUsers.value = ['allowed-user-1'];
+
+      const issue = createMockIssue({ creatorId: 'blocked-user-2' });
+      mockIssues.nodes = [issue];
+
+      const opts = createTestOpts();
+      const channel = new LinearChannel('lin_api_key', 'user-bot-123', 60000, opts);
+      await channel.connect();
+
+      // First poll: filtered (not delivered)
+      expect(opts.onMessage).not.toHaveBeenCalled();
+
+      // Second poll: same issue — should NOT re-process
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(opts.onMessage).not.toHaveBeenCalled();
+
+      await channel.disconnect();
+    });
+
+    it('skips comment from user not in LINEAR_ALLOWED_USERS', async () => {
+      const opts = createTestOpts();
+      const channel = new LinearChannel('lin_api_key', 'user-bot-123', 60000, opts);
+
+      // Start with empty allowed list (all users accepted)
+      mockAllowedUsers.value = [];
+      mockIssues.nodes = [];
+      await channel.connect();
+
+      // Deliver an issue first (from allowed creator)
+      const issue = createMockIssue({ creatorId: 'allowed-user-1' });
+      mockIssues.nodes = [issue];
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(opts.onMessage).toHaveBeenCalledTimes(1);
+
+      // Now enable filtering
+      mockAllowedUsers.value = ['allowed-user-1'];
+
+      // Add a comment from a non-allowed user
+      const updatedIssue = createMockIssue({
+        updatedAt: new Date('2024-06-02T12:00:00Z'),
+        creatorId: 'allowed-user-1',
+        comments: {
+          nodes: [
+            {
+              id: 'comment-blocked-1',
+              body: 'Comment from blocked user',
+              createdAt: new Date('2024-06-02T12:00:00Z'),
+              user: Promise.resolve({
+                id: 'blocked-user-2',
+                displayName: 'Blocked',
+                name: 'blocked',
+              }),
+            },
+          ],
+        },
+      });
+      mockIssues.nodes = [updatedIssue];
+      await vi.advanceTimersByTimeAsync(60000);
+
+      // Only the original issue delivery — comment was filtered
+      expect(opts.onMessage).toHaveBeenCalledTimes(1);
+
+      await channel.disconnect();
+    });
+
+    it('delivers comment from allowed user when filter is active', async () => {
+      mockAllowedUsers.value = ['allowed-user-1'];
+
+      const opts = createTestOpts();
+      const channel = new LinearChannel('lin_api_key', 'user-bot-123', 60000, opts);
+
+      mockIssues.nodes = [];
+      await channel.connect();
+
+      // Deliver issue from allowed creator
+      const issue = createMockIssue({ creatorId: 'allowed-user-1' });
+      mockIssues.nodes = [issue];
+      await vi.advanceTimersByTimeAsync(60000);
+      expect(opts.onMessage).toHaveBeenCalledTimes(1);
+
+      // Add comment from the allowed user
+      const updatedIssue = createMockIssue({
+        updatedAt: new Date('2024-06-02T12:00:00Z'),
+        creatorId: 'allowed-user-1',
+        comments: {
+          nodes: [
+            {
+              id: 'comment-allowed-1',
+              body: 'Comment from allowed user',
+              createdAt: new Date('2024-06-02T12:00:00Z'),
+              user: Promise.resolve({
+                id: 'allowed-user-1',
+                displayName: 'Allowed',
+                name: 'allowed',
+              }),
+            },
+          ],
+        },
+      });
+      mockIssues.nodes = [updatedIssue];
+      await vi.advanceTimersByTimeAsync(60000);
+
+      // Issue + comment = 2 deliveries
+      expect(opts.onMessage).toHaveBeenCalledTimes(2);
 
       await channel.disconnect();
     });

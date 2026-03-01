@@ -1,6 +1,6 @@
 import { LinearClient, Issue } from '@linear/sdk';
 
-import { ASSISTANT_NAME } from '../config.js';
+import { ASSISTANT_NAME, LINEAR_ALLOWED_USERS } from '../config.js';
 import { getRouterState, setRouterState } from '../db.js';
 import { logger } from '../logger.js';
 import {
@@ -62,6 +62,16 @@ export class LinearChannel implements Channel {
     );
   }
 
+  /**
+   * Check if a Linear user ID is in the allowed list.
+   * Returns true if the filter is disabled (empty list) or the user is allowed.
+   */
+  private isUserAllowed(userId: string | undefined): boolean {
+    if (LINEAR_ALLOWED_USERS.length === 0) return true;
+    if (!userId) return false;
+    return LINEAR_ALLOWED_USERS.includes(userId);
+  }
+
   async connect(): Promise<void> {
     this.client = new LinearClient({ apiKey: this.apiKey });
 
@@ -110,6 +120,10 @@ export class LinearChannel implements Channel {
           this.processedIssues.set(issueId, updatedAt);
           // Mark all existing comments as seen to avoid flooding
           await this.markExistingComments(issue);
+          if (!this.isUserAllowed(issue.creatorId)) {
+            logger.debug({ issueId: issue.id, creatorId: issue.creatorId }, 'Skipping issue from non-allowed creator');
+            continue;
+          }
           await this.deliverIssue(issue, 'assigned');
         } else if (updatedAt !== this.processedIssues.get(issueId)) {
           // Issue updated — check for new comments
@@ -259,6 +273,7 @@ export class LinearChannel implements Channel {
         this.processedCommentIds.add(comment.id);
 
         if (comment.user?.id === this.userId) continue;
+        if (!this.isUserAllowed(comment.user?.id)) continue;
 
         const issue = comment.issue;
         if (!issue) continue;
@@ -310,6 +325,7 @@ export class LinearChannel implements Channel {
 
         // Skip comments from the bot's own Linear account to prevent loops
         if (commentUser.id === this.userId) continue;
+        if (!this.isUserAllowed(commentUser.id)) continue;
 
         this.lastDeliveredIssueId = issue.id;
         const timestamp = comment.createdAt.toISOString();

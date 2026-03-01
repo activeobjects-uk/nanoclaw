@@ -99,6 +99,22 @@ LINEAR_POLL_INTERVAL=30000
 GITHUB_TOKEN=<your-github-token>
 ```
 
+`LINEAR_ALLOWED_USERS` is optional — when set, only issues/comments from these Linear user IDs are processed. To find user IDs for your workspace:
+
+```bash
+curl.exe -s -H "Authorization: <API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ users { nodes { id displayName email } } }"}' \
+  https://api.linear.app/graphql
+```
+
+Copy the `id` values for each team member you want to allow and set:
+```bash
+LINEAR_ALLOWED_USERS=uuid1,uuid2,uuid3
+```
+
+When empty or unset, all workspace users can interact with the bot (default).
+
 `GITHUB_TOKEN` is optional but recommended — the Linear agent uses it to publish HTML mockups as GitHub Gists via the `create-mockup` skill. Create a [Personal Access Token](https://github.com/settings/tokens) with the `gist` scope. If omitted, mockups will be attached as files to the Linear issue instead.
 
 Sync to container environment:

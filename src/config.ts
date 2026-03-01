@@ -12,6 +12,7 @@ const envConfig = readEnvFile([
   'LINEAR_API_KEY',
   'LINEAR_USER_ID',
   'LINEAR_POLL_INTERVAL',
+  'LINEAR_ALLOWED_USERS',
 ]);
 
 export const ASSISTANT_NAME =
@@ -82,3 +83,9 @@ export const LINEAR_POLL_INTERVAL = parseInt(
 );
 export const GITHUB_TOKEN =
   process.env.GITHUB_TOKEN || envConfig.GITHUB_TOKEN || '';
+
+// Linear user filter — when set, only these user IDs can trigger the bot
+const rawAllowedUsers = process.env.LINEAR_ALLOWED_USERS || envConfig.LINEAR_ALLOWED_USERS || '';
+export const LINEAR_ALLOWED_USERS: string[] = rawAllowedUsers
+  ? rawAllowedUsers.split(',').map(id => id.trim()).filter(Boolean)
+  : [];
